@@ -443,4 +443,16 @@ html, body {
   width: calc(100% - 40px);
 }
 
+.link-other {
+  display: inline-block;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.link-other:active {
+  color: var(--primary);
+}
+
 .hidden { display: none !important; }

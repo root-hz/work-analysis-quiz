@@ -4,36 +4,36 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#2563eb">
-  <title>工作分析 · 即测即评</title>
-  <link rel="stylesheet" href="css/app.css">
+  <meta name="theme-color" content="#b91c1c">
+  <title>马克思主义基本原理 · 即测即评</title>
+  <link rel="stylesheet" href="../css/app.css">
+  <link rel="stylesheet" href="../css/marxism.css">
 </head>
 <body>
   <div id="app">
-    <!-- 首页 -->
     <section id="screen-home" class="screen active">
       <div class="hero">
-        <div class="hero-icon">📚</div>
-        <h1>工作分析习题集</h1>
-        <p class="subtitle">即测即评 · 共 100 题</p>
+        <div class="hero-icon">📖</div>
+        <h1>马克思主义基本原理</h1>
+        <p class="subtitle">26年春季练习题 · 即测即评</p>
         <ul class="info-list">
-          <li>判断题 30 · 单选题 40 · 多选题 30</li>
+          <li>单选题 158 · 多选题 104 · 共 262 题</li>
           <li>答错即时显示正确答案</li>
-          <li>完成后汇总全部错题</li>
+          <li>完成后汇总错题并评分</li>
+          <li>无时间限制，可随时暂停</li>
         </ul>
         <button id="btn-start" class="btn btn-primary btn-lg">开始答题</button>
-        <a href="marxism/" class="link-other">马克思主义基本原理习题集 →</a>
+        <a href="../index.html" class="link-other">← 返回工作分析习题集</a>
       </div>
     </section>
 
-    <!-- 答题页 -->
     <section id="screen-quiz" class="screen">
       <header class="quiz-header">
         <div class="progress-wrap">
           <div class="progress-bar">
             <div id="progress-fill" class="progress-fill"></div>
           </div>
-          <span id="progress-text" class="progress-text">1 / 100</span>
+          <span id="progress-text" class="progress-text">1 / 262</span>
         </div>
         <div class="meta-row">
           <span id="q-type" class="badge">单选题</span>
@@ -51,7 +51,6 @@
       </footer>
     </section>
 
-    <!-- 答错弹层 -->
     <div id="modal-wrong" class="modal hidden">
       <div class="modal-backdrop"></div>
       <div class="modal-card wrong-card">
@@ -65,12 +64,10 @@
       </div>
     </div>
 
-    <!-- 答对提示 -->
     <div id="toast-correct" class="toast hidden">
       <span>✓ 回答正确</span>
     </div>
 
-    <!-- 结果页 -->
     <section id="screen-result" class="screen">
       <div class="result-hero">
         <div id="result-score-circle" class="score-circle">
@@ -95,7 +92,7 @@
     </section>
   </div>
 
-  <script src="data/questions.js"></script>
-  <script src="js/app.js"></script>
+  <script src="../data/marxism-questions.js"></script>
+  <script src="../js/marxism-app.js"></script>
 </body>
 </html>
