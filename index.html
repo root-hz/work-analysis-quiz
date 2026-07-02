@@ -5,30 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#2563eb">
-  <title>工作分析 · 即测即评</title>
+  <title>习题集 · 即测即评</title>
   <link rel="stylesheet" href="css/app.css">
 </head>
-<body>
+<body data-theme="blue">
   <div id="app">
-    <!-- 首页 -->
-    <section id="screen-home" class="screen active">
-      <div class="hero">
-        <div class="hero-icon">📚</div>
-        <h1>工作分析习题集</h1>
-        <p class="subtitle">即测即评 · 共 100 题</p>
-        <ul class="info-list">
-          <li>判断题 30 · 单选题 40 · 多选题 30</li>
-          <li>答错即时显示正确答案</li>
-          <li>完成后汇总全部错题</li>
-        </ul>
-        <button id="btn-start" class="btn btn-primary btn-lg">开始答题</button>
-        <a href="marxism/" class="link-other">马克思主义基本原理习题集 →</a>
+    <!-- 选题首页 -->
+    <section id="screen-hub" class="screen active">
+      <div class="hero hub-hero">
+        <div class="hero-icon">📝</div>
+        <h1>习题集 · 即测即评</h1>
+        <p class="subtitle">选择一个习题集开始练习</p>
+        <div id="quiz-cards" class="quiz-cards"></div>
       </div>
     </section>
 
     <!-- 答题页 -->
     <section id="screen-quiz" class="screen">
       <header class="quiz-header">
+        <button id="btn-back-hub" class="btn-back" type="button">← 返回</button>
         <div class="progress-wrap">
           <div class="progress-bar">
             <div id="progress-fill" class="progress-fill"></div>
@@ -37,6 +32,9 @@
         </div>
         <div class="meta-row">
           <span id="q-type" class="badge">单选题</span>
+          <span id="quiz-title" class="chapter"></span>
+        </div>
+        <div class="meta-row">
           <span id="q-chapter" class="chapter"></span>
         </div>
       </header>
@@ -78,6 +76,7 @@
           <small>分</small>
         </div>
         <h2>答题完成</h2>
+        <p id="result-set-name" class="result-set-name"></p>
         <p id="result-summary" class="result-summary"></p>
       </div>
 
@@ -92,10 +91,13 @@
       </div>
 
       <button id="btn-restart" class="btn btn-primary btn-lg">重新答题</button>
+      <button id="btn-back-hub-result" class="btn btn-secondary btn-lg">返回选题</button>
     </section>
   </div>
 
   <script src="data/questions.js"></script>
+  <script src="data/marxism-questions.js"></script>
+  <script src="data/quiz-sets.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

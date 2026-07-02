@@ -1,7 +1,8 @@
 (function () {
   'use strict';
 
-  const questions = window.QUIZ_DATA;
+  let currentSet = null;
+  let questions = [];
   let currentIndex = 0;
   let selected = new Set();
   let wrongAnswers = [];
@@ -9,7 +10,7 @@
   const $ = (sel) => document.querySelector(sel);
 
   const screens = {
-    home: $('#screen-home'),
+    hub: $('#screen-hub'),
     quiz: $('#screen-quiz'),
     result: $('#screen-result'),
   };
@@ -19,7 +20,43 @@
     screens[name].classList.add('active');
   }
 
-  /* ── Answer helpers ── */
+  function applyTheme(theme) {
+    document.body.dataset.theme = theme || 'blue';
+    const color = theme === 'red' ? '#b91c1c' : '#2563eb';
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color);
+  }
+
+  function renderHub() {
+    const container = $('#quiz-cards');
+    container.innerHTML = '';
+
+    Object.values(window.QUIZ_SETS).forEach((set) => {
+      const card = document.createElement('button');
+      card.className = `quiz-card quiz-card-${set.theme}`;
+      card.type = 'button';
+      card.innerHTML = `
+        <div class="card-icon">${set.icon}</div>
+        <div class="card-body">
+          <h2>${set.title}</h2>
+          <p>${set.subtitle}</p>
+          <ul>${set.info.map((line) => `<li>${line}</li>`).join('')}</ul>
+        </div>
+        <span class="card-action">开始答题 →</span>`;
+      card.addEventListener('click', () => startQuiz(set.id));
+      container.appendChild(card);
+    });
+  }
+
+  function startQuiz(setId) {
+    currentSet = window.QUIZ_SETS[setId];
+    if (!currentSet) return;
+
+    questions = currentSet.questions() || [];
+    applyTheme(currentSet.theme);
+    document.title = `${currentSet.title} · 即测即评`;
+    $('#quiz-title').textContent = currentSet.title;
+    restart();
+  }
 
   function normalizeMulti(str) {
     return str.toUpperCase().split('').filter((c) => /[A-H]/.test(c)).sort().join('');
@@ -78,13 +115,11 @@
     return [...sel][0] === q.answer;
   }
 
-  /* ── Render question ── */
-
   function renderQuestion() {
     const q = questions[currentIndex];
     selected = new Set();
 
-    const pct = ((currentIndex) / questions.length) * 100;
+    const pct = (currentIndex / questions.length) * 100;
     $('#progress-fill').style.width = `${pct}%`;
     $('#progress-text').textContent = `${currentIndex + 1} / ${questions.length}`;
     $('#q-type').textContent = q.type;
@@ -130,8 +165,6 @@
     $('#btn-submit').disabled = selected.size === 0;
   }
 
-  /* ── Submit & navigate ── */
-
   function submitAnswer() {
     const q = questions[currentIndex];
     const correct = isCorrect(q, selected);
@@ -174,8 +207,6 @@
     }
   }
 
-  /* ── Result ── */
-
   function showResult() {
     const total = questions.length;
     const wrong = wrongAnswers.length;
@@ -184,6 +215,7 @@
 
     $('#result-score').textContent = score;
     $('#result-summary').textContent = `共 ${total} 题，答对 ${correct} 题，答错 ${wrong} 题`;
+    $('#result-set-name').textContent = currentSet ? currentSet.title : '';
 
     const wrongSection = $('#wrong-section');
     const perfectMsg = $('#perfect-msg');
@@ -198,7 +230,7 @@
 
       const list = $('#wrong-list');
       list.innerHTML = '';
-      wrongAnswers.forEach((item, i) => {
+      wrongAnswers.forEach((item) => {
         const div = document.createElement('div');
         div.className = 'wrong-item';
         div.innerHTML = `
@@ -224,11 +256,16 @@
     showScreen('quiz');
   }
 
-  /* ── Events ── */
+  function getQuizFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const queryId = params.get('quiz');
+    if (queryId && window.QUIZ_SETS[queryId]) return queryId;
 
-  $('#btn-start').addEventListener('click', () => {
-    restart();
-  });
+    const hashId = window.location.hash.replace('#', '');
+    if (hashId && window.QUIZ_SETS[hashId]) return hashId;
+
+    return null;
+  }
 
   $('#btn-submit').addEventListener('click', submitAnswer);
 
@@ -238,7 +275,24 @@
   });
 
   $('#btn-restart').addEventListener('click', () => {
-    showScreen('home');
+    if (currentSet) startQuiz(currentSet.id);
   });
+
+  $('#btn-back-hub').addEventListener('click', () => {
+    document.title = '习题集 · 即测即评';
+    applyTheme('blue');
+    showScreen('hub');
+  });
+
+  $('#btn-back-hub-result').addEventListener('click', () => {
+    document.title = '习题集 · 即测即评';
+    applyTheme('blue');
+    showScreen('hub');
+  });
+
+  renderHub();
+
+  const autoStart = getQuizFromUrl();
+  if (autoStart) startQuiz(autoStart);
 
 })();
