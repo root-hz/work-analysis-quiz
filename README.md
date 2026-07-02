@@ -4,7 +4,9 @@
 
 ## 在线访问
 
-部署后访问：`https://<你的GitHub用户名>.github.io/work-analysis-quiz/`
+**https://root-hz.github.io/work-analysis-quiz/**
+
+（首次部署后可能需要 1-3 分钟生效）
 
 ## 本地运行
 
