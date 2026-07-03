@@ -4,7 +4,12 @@
   const WIN_DIST = 1000;
   const GRAVITY = 2200;
   const JUMP_V = -620;
+  const JUMP_V2 = -540;
+  const SLIDE_DUR = 0.65;
+  const STAND_H = 28;
+  const SLIDE_H = 14;
   const GROUND_RATIO = 0.78;
+  const COIN_VALUE = 10;
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -16,14 +21,21 @@
   const screenOver = document.getElementById('screen-over');
   const screenWin = document.getElementById('screen-win');
   const scoreEl = document.getElementById('score');
+  const coinsEl = document.getElementById('coins');
+  const jumpsEl = document.getElementById('jumps');
   const bestEl = document.getElementById('best');
   const overTitle = document.getElementById('over-title');
   const overScore = document.getElementById('over-score');
+  const overCoins = document.getElementById('over-coins');
+  const winCoins = document.getElementById('win-coins');
+  const btnSlide = document.getElementById('btn-slide');
 
-  let W = 0, H = 0, GY = 0, scale = 1;
+  let W = 0, H = 0, GY = 0;
   let state = 'title';
-  let dist = 0, speed = 280, best = +localStorage.getItem('runner-best') || 0;
-  let player, obstacles, clouds, tiles, animId, lastT;
+  let dist = 0, speed = 280, coins = 0;
+  let best = +localStorage.getItem('runner-best') || 0;
+  let player, obstacles, coinItems, clouds, animId, lastT;
+  let spawnTimer = 0, coinTimer = 0;
 
   bestEl.textContent = `BEST ${best}m`;
 
@@ -34,40 +46,115 @@
     H = wrap.clientHeight - controlsH;
     canvas.width = Math.floor(W / 2);
     canvas.height = Math.floor(H / 2);
-    scale = canvas.width / W;
     GY = canvas.height * GROUND_RATIO;
   }
 
   function reset() {
     dist = 0;
     speed = 280;
-    player = { x: 48, y: 0, vy: 0, w: 22, h: 28, grounded: true, frame: 0 };
+    coins = 0;
+    player = {
+      x: 48, y: 0, vy: 0, w: 22, h: STAND_H,
+      grounded: true, sliding: false, slideT: 0,
+      jumpsLeft: 2, frame: 0,
+    };
     obstacles = [];
+    coinItems = [];
     clouds = Array.from({ length: 6 }, (_, i) => ({
       x: i * 80 + Math.random() * 40,
       y: 20 + Math.random() * (GY * 0.35),
       s: 0.6 + Math.random() * 0.8,
     }));
-    tiles = 0;
-    spawnTimer = 0;
+    spawnTimer = 0.5;
+    coinTimer = 0.3;
+    updateHud();
   }
 
-  let spawnTimer = 0;
+  function updateHud() {
+    scoreEl.textContent = `${Math.floor(dist)}m`;
+    coinsEl.textContent = String(coins);
+    const dots = jumpsEl.querySelectorAll('i');
+    dots[0].classList.toggle('on', player.jumpsLeft >= 1);
+    dots[1].classList.toggle('on', player.jumpsLeft >= 2);
+    btnSlide.disabled = !player.grounded || player.sliding;
+  }
 
   function spawnObstacle() {
-    const type = Math.random() < 0.65 ? 'rock' : 'bird';
-    if (type === 'rock') {
+    const r = Math.random();
+    if (r < 0.45) {
       const h = 18 + Math.floor(Math.random() * 3) * 6;
       obstacles.push({ type: 'rock', x: canvas.width + 20, y: GY - h, w: 16 + Math.random() * 10, h });
-    } else if (dist > 150) {
-      obstacles.push({ type: 'bird', x: canvas.width + 20, y: GY - 52 - Math.random() * 20, w: 22, h: 14, flap: 0 });
+    } else if (r < 0.72 && dist > 120) {
+      obstacles.push({ type: 'bird', x: canvas.width + 20, y: GY - 52 - Math.random() * 18, w: 22, h: 14, flap: 0 });
+    } else if (dist > 180) {
+      const barH = 8;
+      obstacles.push({ type: 'beam', x: canvas.width + 20, y: GY - 34, w: 28 + Math.random() * 16, h: barH });
+    } else {
+      const h = 18 + Math.floor(Math.random() * 2) * 6;
+      obstacles.push({ type: 'rock', x: canvas.width + 20, y: GY - h, w: 16, h });
     }
   }
 
+  function spawnCoin() {
+    const lane = Math.random();
+    let y;
+    if (lane < 0.35) y = 0;
+    else if (lane < 0.7) y = 38 + Math.random() * 12;
+    else y = 62 + Math.random() * 15;
+    coinItems.push({
+      x: canvas.width + 16,
+      y,
+      r: 7,
+      spin: Math.random() * 6.28,
+      bob: Math.random() * 6.28,
+    });
+  }
+
   function jump() {
-    if (state !== 'play' || !player.grounded) return;
-    player.vy = JUMP_V;
-    player.grounded = false;
+    if (state !== 'play' || player.sliding) return;
+    if (player.grounded) {
+      player.vy = JUMP_V;
+      player.grounded = false;
+      player.jumpsLeft = 1;
+    } else if (player.jumpsLeft > 0) {
+      player.vy = JUMP_V2;
+      player.jumpsLeft = 0;
+    } else return;
+    updateHud();
+  }
+
+  function slide() {
+    if (state !== 'play' || !player.grounded || player.sliding) return;
+    player.sliding = true;
+    player.slideT = SLIDE_DUR;
+    player.h = SLIDE_H;
+    player.jumpsLeft = 0;
+    updateHud();
+  }
+
+  function endSlide() {
+    player.sliding = false;
+    player.slideT = 0;
+    player.h = STAND_H;
+    player.jumpsLeft = 2;
+    updateHud();
+  }
+
+  function playerHitbox() {
+    const h = player.h;
+    const py = GY - h - player.y;
+    const pad = player.sliding ? 2 : 4;
+    return { x: player.x + pad, y: py + pad, w: player.w - pad * 2, h: h - pad * 2 };
+  }
+
+  function popText(text, x, y) {
+    const el = document.createElement('div');
+    el.className = 'collect-pop';
+    el.textContent = text;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 600);
   }
 
   function drawSky() {
@@ -99,10 +186,26 @@
   }
 
   function drawPlayer() {
-    const { x, y, w, h, frame, grounded } = player;
+    const { x, y, w, h, frame, grounded, sliding } = player;
     const py = GY - h - y;
-    const leg = grounded ? (Math.floor(frame / 4) % 2 ? 2 : -2) : 0;
 
+    if (sliding) {
+      ctx.fillStyle = '#1a1c2c';
+      ctx.fillRect(x - 1, py - 1, w + 2, h + 2);
+      ctx.fillStyle = '#4169e1';
+      ctx.fillRect(x, py + 4, w, h - 4);
+      ctx.fillStyle = '#f5c898';
+      ctx.fillRect(x + 10, py, 12, 10);
+      ctx.fillStyle = '#ffd700';
+      ctx.fillRect(x + 8, py - 2, 14, 4);
+      ctx.fillStyle = '#e45050';
+      ctx.fillRect(x + w - 4, py + 6, 8, 4);
+      ctx.fillStyle = '#2c3e80';
+      ctx.fillRect(x + 2, py + h - 6, w - 4, 6);
+      return;
+    }
+
+    const leg = grounded ? (Math.floor(frame / 4) % 2 ? 2 : -2) : 0;
     ctx.fillStyle = '#1a1c2c';
     ctx.fillRect(x - 1, py - 1, w + 2, h + 2);
     ctx.fillStyle = '#4169e1';
@@ -139,8 +242,50 @@
     ctx.fillRect(o.x + o.w - 4, o.y + wing + 4, 8, 3);
   }
 
-  function aabb(ax, ay, aw, ah, bx, by, bw, bh) {
-    return ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+  function drawBeam(o) {
+    ctx.fillStyle = '#1a1c2c';
+    ctx.fillRect(o.x - 1, o.y - 1, o.w + 2, o.h + 2);
+    ctx.fillStyle = '#8b4513';
+    ctx.fillRect(o.x, o.y, o.w, o.h);
+    ctx.fillStyle = '#cd853f';
+    ctx.fillRect(o.x, o.y, o.w, 3);
+    ctx.fillStyle = '#5d275d';
+    ctx.fillRect(o.x - 3, o.y - 2, 4, o.h + 4);
+    ctx.fillRect(o.x + o.w - 1, o.y - 2, 4, o.h + 4);
+  }
+
+  function drawCoin(c) {
+    c.spin += 0.12;
+    c.bob += 0.08;
+    const cy = GY - c.y - c.r + Math.sin(c.bob) * 2;
+    const squash = 0.55 + Math.abs(Math.cos(c.spin)) * 0.45;
+    const rw = c.r * 2 * squash;
+    ctx.fillStyle = '#1a1c2c';
+    ctx.beginPath();
+    ctx.ellipse(c.x, cy, rw / 2 + 1, c.r + 1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.ellipse(c.x, cy, rw / 2, c.r, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffee88';
+    ctx.fillRect(c.x - 1, cy - 2, 2, 4);
+  }
+
+  function aabb(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  function checkObstacleHit(o, box) {
+    if (o.type === 'bird') {
+      if (player.sliding || player.y < 8) return false;
+      return aabb(box, { x: o.x, y: o.y, w: o.w, h: o.h });
+    }
+    if (o.type === 'beam') {
+      if (player.sliding) return false;
+      return aabb(box, { x: o.x, y: o.y, w: o.w, h: o.h });
+    }
+    return aabb(box, { x: o.x, y: o.y, w: o.w, h: o.h });
   }
 
   function update(dt) {
@@ -150,43 +295,77 @@
     speed = Math.min(520, 280 + dist * 0.08);
     scoreEl.textContent = `${Math.floor(dist)}m`;
 
-    player.vy += GRAVITY * dt;
-    player.y -= player.vy * dt;
-    if (player.y <= 0) {
-      player.y = 0;
-      player.vy = 0;
-      player.grounded = true;
+    if (player.sliding) {
+      player.slideT -= dt;
+      if (player.slideT <= 0) endSlide();
+    } else {
+      player.vy += GRAVITY * dt;
+      player.y -= player.vy * dt;
+      if (player.y <= 0) {
+        player.y = 0;
+        player.vy = 0;
+        if (!player.grounded) {
+          player.grounded = true;
+          player.jumpsLeft = 2;
+          updateHud();
+        }
+        player.grounded = true;
+      } else {
+        player.grounded = false;
+      }
     }
     player.frame++;
 
     spawnTimer -= dt;
-    const gap = Math.max(0.85, 1.6 - dist * 0.0008);
+    const gap = Math.max(0.75, 1.5 - dist * 0.0007);
     if (spawnTimer <= 0) {
       spawnObstacle();
-      spawnTimer = gap + Math.random() * 0.5;
+      spawnTimer = gap + Math.random() * 0.45;
     }
 
-    const scroll = dist * 3;
+    coinTimer -= dt;
+    if (coinTimer <= 0) {
+      if (Math.random() < 0.72) spawnCoin();
+      coinTimer = 0.35 + Math.random() * 0.35;
+    }
+
     clouds.forEach(c => {
       c.x -= speed * dt * 0.025 * c.s;
       if (c.x < -40) { c.x = canvas.width + 20; c.y = 20 + Math.random() * (GY * 0.35); }
     });
 
-    const px = player.x, py = GY - player.h - player.y, pw = player.w, ph = player.h;
+    const box = playerHitbox();
+
+    for (let i = coinItems.length - 1; i >= 0; i--) {
+      const c = coinItems[i];
+      c.x -= speed * dt;
+      if (c.x < -20) { coinItems.splice(i, 1); continue; }
+      const cy = GY - c.y - c.r;
+      const dx = (player.x + player.w / 2) - c.x;
+      const dy = (box.y + box.h / 2) - cy;
+      if (dx * dx + dy * dy < (c.r + 14) ** 2) {
+        coins++;
+        dist += COIN_VALUE * 0.2;
+        coinsEl.textContent = String(coins);
+        const rect = canvas.getBoundingClientRect();
+        const sx = rect.left + (c.x / canvas.width) * rect.width;
+        const sy = rect.top + (cy / canvas.height) * rect.height;
+        popText('+1', sx, sy);
+        coinItems.splice(i, 1);
+      }
+    }
 
     for (let i = obstacles.length - 1; i >= 0; i--) {
       const o = obstacles[i];
       o.x -= speed * dt;
-      if (o.x + o.w < -10) { obstacles.splice(i, 1); continue; }
-
-      const pad = 4;
-      if (aabb(px + pad, py + pad, pw - pad * 2, ph - pad * 2, o.x, o.y, o.w, o.h)) {
-        if (o.type === 'bird' && player.y < 35) continue;
+      if (o.x + (o.w || 30) < -10) { obstacles.splice(i, 1); continue; }
+      if (checkObstacleHit(o, box)) {
         gameOver();
         return;
       }
     }
 
+    updateHud();
     if (dist >= WIN_DIST) win();
   }
 
@@ -194,7 +373,12 @@
     drawSky();
     clouds.forEach(drawCloud);
     drawGround(scroll);
-    obstacles.forEach(o => o.type === 'rock' ? drawRock(o) : drawBird(o));
+    coinItems.forEach(drawCoin);
+    obstacles.forEach(o => {
+      if (o.type === 'rock') drawRock(o);
+      else if (o.type === 'bird') drawBird(o);
+      else drawBeam(o);
+    });
     drawPlayer();
 
     ctx.fillStyle = 'rgba(0,0,0,0.35)';
@@ -240,8 +424,9 @@
       localStorage.setItem('runner-best', best);
       bestEl.textContent = `BEST ${best}m`;
     }
-    overTitle.textContent = d >= WIN_DIST * 0.8 ? '差一点!' : '撞到了!';
+    overTitle.textContent = d >= WIN_DIST * 0.85 ? '差一点!' : '撞到了!';
     overScore.textContent = `${d}m`;
+    overCoins.textContent = `金币 x${coins}`;
     screenOver.classList.remove('hidden');
   }
 
@@ -253,16 +438,24 @@
       localStorage.setItem('runner-best', best);
       bestEl.textContent = `BEST ${best}m`;
     }
+    winCoins.textContent = `金币 x${coins} · ${d}m`;
     screenWin.classList.remove('hidden');
   }
 
   document.getElementById('btn-start').onclick = start;
   document.getElementById('btn-retry').onclick = start;
   document.getElementById('btn-win-retry').onclick = start;
-  document.getElementById('btn-jump').addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
-  document.getElementById('btn-jump').addEventListener('mousedown', e => { e.preventDefault(); jump(); });
+
+  const bindBtn = (el, fn) => {
+    el.addEventListener('touchstart', e => { e.preventDefault(); fn(); }, { passive: false });
+    el.addEventListener('mousedown', e => { e.preventDefault(); fn(); });
+  };
+  bindBtn(document.getElementById('btn-jump'), jump);
+  bindBtn(btnSlide, slide);
+
   document.addEventListener('keydown', e => {
     if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); jump(); }
+    if (e.code === 'ArrowDown' || e.code === 'ShiftLeft') { e.preventDefault(); slide(); }
   });
 
   window.addEventListener('resize', () => { if (state === 'play') resize(); });
