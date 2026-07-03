@@ -172,8 +172,7 @@ function updateHud() {
 
 function createPlayerMesh() {
   const g = new THREE.Group();
-  addVoxel(g, 0.5, 0.5, 0.35, 0xf4a460, 0, 0.5, 0); // head
-  addVoxel(g, 0.55, 0.55, 0.55, 0xf4a460, 0, 0.5, 0); // face detail
+  addVoxel(g, 0.5, 0.5, 0.4, 0xf4a460, 0, 0.55, 0); // head
   addVoxel(g, 0.7, 0.2, 0.75, 0xffd700, 0, 1.05, 0); // helm
   addVoxel(g, 0.6, 0.7, 0.4, 0x4169e1, 0, 0.35, 0); // body
   addVoxel(g, 0.5, 0.6, 0.15, 0xc0392b, 0, 0.35, 0.28); // cape
