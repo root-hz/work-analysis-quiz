@@ -26,6 +26,26 @@ html, body {
   height: 58dvh;
   background: #0f0f23;
   overflow: hidden;
+  border-bottom: 4px solid #fff;
+  box-shadow:
+    inset 0 0 0 4px #1a1c2c,
+    inset 0 0 0 8px #5d275d,
+    0 4px 0 #322125;
+}
+
+#game-viewport::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+  z-index: 5;
 }
 
 #game-canvas {
@@ -43,8 +63,10 @@ html, body {
   bottom: 0;
   height: 42vh;
   height: 42dvh;
-  background: #1a1c2c;
-  border-top: 4px solid #5d275d;
+  background:
+    repeating-linear-gradient(90deg, #1a1c2c 0, #1a1c2c 8px, #222438 8px, #222438 16px);
+  border-top: 4px solid #fff;
+  box-shadow: inset 0 4px 0 #5d275d;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -91,17 +113,21 @@ html, body {
 .hp-bar-wrap {
   flex: 1;
   position: relative;
-  height: 18px;
+  height: 20px;
   background: #2d1b2e;
   border: 3px solid #fff;
-  image-rendering: pixelated;
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35);
 }
 
 .hp-fill {
   height: 100%;
   width: 100%;
-  background: #ff0044;
-  transition: width 0.15s steps(8);
+  background: repeating-linear-gradient(
+    90deg,
+    #ff0044 0, #ff0044 6px,
+    #cc0033 6px, #cc0033 12px
+  );
+  transition: width 0.15s steps(10);
 }
 
 .hp-bar-wrap span {
@@ -186,8 +212,9 @@ html, body {
   width: 130px;
   height: 130px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
-  border: 4px solid rgba(255, 255, 255, 0.25);
+  background: radial-gradient(circle at 35% 35%, #3a3a50, #1a1c2c);
+  border: 4px solid #fff;
+  box-shadow: inset 0 0 0 4px #5d275d, 4px 4px 0 #322125;
 }
 
 .joystick-stick {
@@ -198,8 +225,9 @@ html, body {
   top: 50%;
   margin: -28px 0 0 -28px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.45);
-  border: 4px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(circle at 30% 30%, #8888aa, #484860);
+  border: 4px solid #fff;
+  box-shadow: 2px 2px 0 #322125;
   pointer-events: none;
   will-change: transform;
 }
@@ -273,9 +301,25 @@ html, body {
 
 .overlay-screen.hidden { display: none; }
 
+.title-pixel-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .title-content {
+  position: relative;
   text-align: center;
   max-width: 340px;
+  z-index: 1;
+  padding: 20px;
+  background: rgba(26, 28, 44, 0.88);
+  border: 4px solid #fff;
+  box-shadow: 6px 6px 0 #5d275d, 8px 8px 0 #322125;
 }
 
 .pixel-logo {
