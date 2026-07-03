@@ -4,109 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#1a1c2c">
-  <title>冲塔传说 · 像素版</title>
+  <title>冲塔跑酷 · 轻量版</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <!-- 上方游戏画面 -->
-  <div id="game-viewport">
-    <canvas id="game-canvas"></canvas>
+  <div id="game-wrap">
+    <canvas id="game"></canvas>
     <div id="hud" class="hud hidden">
-      <div class="hud-row">
-        <div class="hp-bar-wrap">
-          <div id="hp-fill" class="hp-fill"></div>
-          <span id="hp-text">100/100</span>
-        </div>
-        <div id="floor-badge" class="floor-badge">F1</div>
-      </div>
-      <div class="hud-row hud-row-sm">
-        <span>Lv<b id="stat-lv">1</b></span>
-        <span>ATK<b id="stat-str">10</b></span>
-        <span>SPD<b id="stat-spd">10</b></span>
-        <span>DEF<b id="stat-def">5</b></span>
-      </div>
-      <div class="hud-row hud-row-sm">
-        <span id="zone-name" class="zone-name">腐化之域</span>
-        <span id="enemy-count" class="enemy-count">x2</span>
-      </div>
-      <div id="rage-bar" class="rage-bar">
-        <div id="rage-fill" class="rage-fill"></div>
-        <span>ULT</span>
-      </div>
-      <div id="combat-log" class="combat-log"></div>
+      <span id="score">0m</span>
+      <span id="best">BEST 0m</span>
+    </div>
+    <div id="controls" class="controls hidden">
+      <button id="btn-jump" type="button">跳</button>
     </div>
   </div>
 
-  <!-- 下方操作区（竖屏固定） -->
-  <div id="controls" class="controls-panel hidden">
-    <div id="joystick-zone" class="joystick-zone">
-      <div id="joystick-base" class="joystick-base">
-        <div id="joystick-stick" class="joystick-stick"></div>
-      </div>
-      <span class="joystick-label">移动</span>
-    </div>
-    <div class="action-buttons">
-      <button id="btn-dodge" class="action-btn dodge-btn" type="button">闪</button>
-      <button id="btn-attack" class="action-btn attack-btn" type="button">攻</button>
-      <button id="btn-skill" class="action-btn skill-btn" type="button">必</button>
-    </div>
+  <div id="screen-title" class="screen">
+    <h1>冲塔跑酷</h1>
+    <p>轻量版 · 竖屏一键跳跃</p>
+    <ul>
+      <li>自动向前奔跑</li>
+      <li>点击「跳」越过障碍</li>
+      <li>跑满 1000m 通关！</li>
+    </ul>
+    <button id="btn-start" type="button">开始奔跑</button>
   </div>
 
-  <!-- Title -->
-  <div id="screen-title" class="overlay-screen">
-    <canvas id="title-pixel-bg" class="title-pixel-bg" width="360" height="640"></canvas>
-    <div class="title-content">
-      <div class="pixel-logo">冲塔传说</div>
-      <p class="title-sub">16-BIT PIXEL · 竖屏第三人称</p>
-      <ul class="title-tips">
-        <li>下方左摇杆移动</li>
-        <li>右侧 攻 / 闪 / 必 杀</li>
-        <li>清怪 → 打Boss → 冲顶!</li>
-      </ul>
-      <button id="btn-start" class="btn-primary" type="button">START</button>
-    </div>
+  <div id="screen-over" class="screen hidden">
+    <h2 id="over-title">撞到了!</h2>
+    <p id="over-score">0m</p>
+    <button id="btn-retry" type="button">再来一次</button>
   </div>
 
-  <div id="screen-floor-clear" class="overlay-screen hidden">
-    <div class="modal-card">
-      <h2 id="floor-clear-title">CLEAR!</h2>
-      <p id="floor-clear-reward" class="reward-text"></p>
-      <div id="blessing-choices" class="blessing-choices hidden"></div>
-      <button id="btn-next-floor" class="btn-primary" type="button">NEXT</button>
-      <button id="btn-rest" class="btn-secondary" type="button">REST +30</button>
-    </div>
+  <div id="screen-win" class="screen hidden">
+    <h2>通关!</h2>
+    <p class="win-msg">AAA你黄哥最牛</p>
+    <button id="btn-win-retry" type="button">再跑一趟</button>
   </div>
 
-  <div id="screen-gameover" class="overlay-screen hidden">
-    <div class="modal-card gameover-card">
-      <h2>GAME OVER</h2>
-      <p id="gameover-floor"></p>
-      <button id="btn-retry" class="btn-primary" type="button">RETRY</button>
-    </div>
-  </div>
-
-  <div id="screen-victory" class="overlay-screen hidden">
-    <div class="victory-card">
-      <div class="victory-crown">★</div>
-      <h1 class="victory-title">YOU WIN!</h1>
-      <p class="victory-sub">塔顶守护者已击败</p>
-      <div class="victory-message">AAA你黄哥最牛</div>
-      <button id="btn-victory-restart" class="btn-primary" type="button">AGAIN</button>
-    </div>
-  </div>
-
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
-    }
-  }
-  </script>
-  <script type="module" src="js/game.js"></script>
+  <script src="js/game.js"></script>
 </body>
 </html>
