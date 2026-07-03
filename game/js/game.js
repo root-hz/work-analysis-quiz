@@ -10,6 +10,29 @@
   const SLIDE_H = 14;
   const GROUND_RATIO = 0.78;
   const COIN_VALUE = 10;
+  const SPEED_MIN = 230;
+  const SPEED_MAX = 460;
+  const SPAWN_GAP_MAX = 1.55;
+  const SPAWN_GAP_MIN = 0.82;
+
+  /** 0→1 平滑插值，加速过程无突变 */
+  function smoothstep(t) {
+    t = Math.max(0, Math.min(1, t));
+    return t * t * (3 - 2 * t);
+  }
+
+  /** 距离进度 → 当前速度（前段慢、中段渐快、末段才接近上限） */
+  function calcSpeed(distance) {
+    const progress = Math.min(1, distance / WIN_DIST);
+    const eased = smoothstep(progress);
+    return SPEED_MIN + (SPEED_MAX - SPEED_MIN) * eased;
+  }
+
+  /** 障碍生成间隔随速度同步拉长/缩短 */
+  function calcSpawnGap(currentSpeed) {
+    const ratio = (currentSpeed - SPEED_MIN) / (SPEED_MAX - SPEED_MIN);
+    return SPAWN_GAP_MAX - ratio * (SPAWN_GAP_MAX - SPAWN_GAP_MIN);
+  }
 
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
@@ -32,7 +55,7 @@
 
   let W = 0, H = 0, GY = 0;
   let state = 'title';
-  let dist = 0, speed = 280, coins = 0;
+  let dist = 0, speed = SPEED_MIN, coins = 0;
   let best = +localStorage.getItem('runner-best') || 0;
   let player, obstacles, coinItems, clouds, animId, lastT;
   let spawnTimer = 0, coinTimer = 0;
@@ -51,7 +74,7 @@
 
   function reset() {
     dist = 0;
-    speed = 280;
+    speed = SPEED_MIN;
     coins = 0;
     player = {
       x: 48, y: 0, vy: 0, w: 22, h: STAND_H,
@@ -292,7 +315,7 @@
     if (state !== 'play') return;
 
     dist += speed * dt * 0.05;
-    speed = Math.min(520, 280 + dist * 0.08);
+    speed = calcSpeed(dist);
     scoreEl.textContent = `${Math.floor(dist)}m`;
 
     if (player.sliding) {
@@ -317,10 +340,9 @@
     player.frame++;
 
     spawnTimer -= dt;
-    const gap = Math.max(0.75, 1.5 - dist * 0.0007);
     if (spawnTimer <= 0) {
       spawnObstacle();
-      spawnTimer = gap + Math.random() * 0.45;
+      spawnTimer = calcSpawnGap(speed) + Math.random() * 0.35;
     }
 
     coinTimer -= dt;
