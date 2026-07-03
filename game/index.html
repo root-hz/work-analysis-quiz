@@ -5,112 +5,104 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="theme-color" content="#0a0a1a">
-  <title>冲塔传说 · 横屏版</title>
+  <meta name="theme-color" content="#1a1c2c">
+  <title>冲塔传说 · 像素版</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="rotate-hint" class="rotate-hint hidden">
-    <div class="rotate-icon">📱↻</div>
-    <p>请旋转手机至<strong>横屏</strong>以获得最佳体验</p>
-  </div>
-
-  <canvas id="game-canvas"></canvas>
-
-  <!-- HUD -->
-  <div id="hud" class="hud hidden">
-    <div class="hud-top">
-      <div class="hud-left">
+  <!-- 上方游戏画面 -->
+  <div id="game-viewport">
+    <canvas id="game-canvas"></canvas>
+    <div id="hud" class="hud hidden">
+      <div class="hud-row">
         <div class="hp-bar-wrap">
           <div id="hp-fill" class="hp-fill"></div>
-          <span id="hp-text">100 / 100</span>
+          <span id="hp-text">100/100</span>
         </div>
-        <div class="stat-row">
-          <span>Lv.<b id="stat-lv">1</b></span>
-          <span>⚔<b id="stat-str">10</b></span>
-          <span>💨<b id="stat-spd">10</b></span>
-          <span>🛡<b id="stat-def">5</b></span>
-        </div>
+        <div id="floor-badge" class="floor-badge">F1</div>
       </div>
-      <div class="hud-right">
-        <div id="floor-badge" class="floor-badge">第 1 层</div>
-        <div id="zone-name" class="zone-name">腐化之域</div>
-        <div id="enemy-count" class="enemy-count">剩余 2 只</div>
+      <div class="hud-row hud-row-sm">
+        <span>Lv<b id="stat-lv">1</b></span>
+        <span>ATK<b id="stat-str">10</b></span>
+        <span>SPD<b id="stat-spd">10</b></span>
+        <span>DEF<b id="stat-def">5</b></span>
       </div>
+      <div class="hud-row hud-row-sm">
+        <span id="zone-name" class="zone-name">腐化之域</span>
+        <span id="enemy-count" class="enemy-count">x2</span>
+      </div>
+      <div id="rage-bar" class="rage-bar">
+        <div id="rage-fill" class="rage-fill"></div>
+        <span>ULT</span>
+      </div>
+      <div id="combat-log" class="combat-log"></div>
     </div>
-    <div id="rage-bar" class="rage-bar hidden">
-      <div id="rage-fill" class="rage-fill"></div>
-      <span>必杀</span>
-    </div>
-    <div id="combat-log" class="combat-log"></div>
   </div>
 
-  <!-- Touch controls -->
-  <div id="controls" class="controls hidden">
+  <!-- 下方操作区（竖屏固定） -->
+  <div id="controls" class="controls-panel hidden">
     <div id="joystick-zone" class="joystick-zone">
       <div id="joystick-base" class="joystick-base">
         <div id="joystick-stick" class="joystick-stick"></div>
       </div>
+      <span class="joystick-label">移动</span>
     </div>
     <div class="action-buttons">
-      <button id="btn-skill" class="action-btn skill-btn" type="button">必杀</button>
-      <button id="btn-attack" class="action-btn attack-btn" type="button">攻击</button>
-      <button id="btn-dodge" class="action-btn dodge-btn" type="button">闪避</button>
+      <button id="btn-dodge" class="action-btn dodge-btn" type="button">闪</button>
+      <button id="btn-attack" class="action-btn attack-btn" type="button">攻</button>
+      <button id="btn-skill" class="action-btn skill-btn" type="button">必</button>
     </div>
   </div>
 
   <!-- Title -->
   <div id="screen-title" class="overlay-screen">
-    <div class="title-bg"></div>
     <div class="title-content">
-      <h1>冲塔传说</h1>
-      <p class="title-sub">从第 1 层出发，一路冲顶 · 第三人称横屏版</p>
+      <div class="pixel-logo">冲塔传说</div>
+      <p class="title-sub">像素风 · 竖屏第三人称</p>
       <ul class="title-tips">
-        <li>左摇杆移动 · 右侧攻击 / 闪避 / 必杀</li>
-        <li>清空小怪 → 击败层 Boss → 攀登下一层</li>
-        <li>共 10 大区域，登顶塔顶守护者即通关</li>
+        <li>下方左摇杆移动</li>
+        <li>右侧 攻 / 闪 / 必 杀</li>
+        <li>清怪 → 打Boss → 冲顶!</li>
       </ul>
-      <button id="btn-start" class="btn-primary" type="button">开始冲塔</button>
+      <button id="btn-start" class="btn-primary" type="button">START</button>
     </div>
   </div>
 
-  <!-- Floor clear -->
   <div id="screen-floor-clear" class="overlay-screen hidden">
     <div class="modal-card">
-      <h2 id="floor-clear-title">第 1 层 通关！</h2>
+      <h2 id="floor-clear-title">CLEAR!</h2>
       <p id="floor-clear-reward" class="reward-text"></p>
       <div id="blessing-choices" class="blessing-choices hidden"></div>
-      <button id="btn-next-floor" class="btn-primary" type="button">继续攀登</button>
-      <button id="btn-rest" class="btn-secondary" type="button">营地休整 (+30 HP)</button>
+      <button id="btn-next-floor" class="btn-primary" type="button">NEXT</button>
+      <button id="btn-rest" class="btn-secondary" type="button">REST +30</button>
     </div>
   </div>
 
-  <!-- Game over -->
   <div id="screen-gameover" class="overlay-screen hidden">
     <div class="modal-card gameover-card">
-      <h2>塔途终结</h2>
-      <p id="gameover-floor">最高到达：第 1 层</p>
-      <button id="btn-retry" class="btn-primary" type="button">再次冲塔</button>
+      <h2>GAME OVER</h2>
+      <p id="gameover-floor"></p>
+      <button id="btn-retry" class="btn-primary" type="button">RETRY</button>
     </div>
   </div>
 
-  <!-- Victory -->
   <div id="screen-victory" class="overlay-screen hidden">
     <div class="victory-card">
-      <div class="victory-rays"></div>
-      <div class="victory-crown">👑</div>
-      <h1 class="victory-title">塔顶征服者</h1>
-      <p class="victory-sub">你击败了塔顶守护者，冲塔传说达成！</p>
+      <div class="victory-crown">★</div>
+      <h1 class="victory-title">YOU WIN!</h1>
+      <p class="victory-sub">塔顶守护者已击败</p>
       <div class="victory-message">AAA你黄哥最牛</div>
-      <button id="btn-victory-restart" class="btn-primary" type="button">再来一次</button>
+      <button id="btn-victory-restart" class="btn-primary" type="button">AGAIN</button>
     </div>
   </div>
 
   <script type="importmap">
   {
     "imports": {
-      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
     }
   }
   </script>

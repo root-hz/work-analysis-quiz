@@ -1,60 +1,52 @@
 import * as THREE from 'three';
 
-// ─── Zone themes (from GDD, 10 regions = 10 floors) ───
 const ZONES = [
-  { name: '腐化之域', floor: 1,  color: 0x2d5016, fog: 0x1a3010, accent: 0x4ade80 },
-  { name: '熔岩裂隙', floor: 2,  color: 0x7c2d12, fog: 0x3d1508, accent: 0xf97316 },
-  { name: '冰霜回廊', floor: 3,  color: 0x1e3a5f, fog: 0x0f1d30, accent: 0x60a5fa },
-  { name: '暗影尖塔', floor: 4,  color: 0x312e81, fog: 0x1a1840, accent: 0xa78bfa },
-  { name: '雷鸣穹顶', floor: 5,  color: 0x4c1d95, fog: 0x2a1050, accent: 0xfbbf24 },
-  { name: '虚空裂隙', floor: 6,  color: 0x3b0764, fog: 0x1e0432, accent: 0xc084fc },
-  { name: '圣光残垣', floor: 7,  color: 0x713f12, fog: 0x3a2009, accent: 0xfde047 },
-  { name: '龙息巢穴', floor: 8,  color: 0x991b1b, fog: 0x4a0e0e, accent: 0xfca5a5 },
-  { name: '时砂之阶', floor: 9,  color: 0x92400e, fog: 0x4a2007, accent: 0xfcd34d },
-  { name: '终焉之门', floor: 10, color: 0x1f1f1f, fog: 0x0a0a0a, accent: 0xef4444 },
+  { name: '腐化之域', ground: 0x3a5a2a, floor: 0x2a4a1a, accent: 0x5dba5d, sky: 0x1a3020 },
+  { name: '熔岩裂隙', ground: 0x8b3a1a, floor: 0x5a2010, accent: 0xff6622, sky: 0x301008 },
+  { name: '冰霜回廊', ground: 0x4a6a8a, floor: 0x3a5a7a, accent: 0x88ccff, sky: 0x1a2840 },
+  { name: '暗影尖塔', ground: 0x3a2a5a, floor: 0x2a1a4a, accent: 0xaa77ff, sky: 0x150a28 },
+  { name: '雷鸣穹顶', ground: 0x5a4a1a, floor: 0x4a3a0a, accent: 0xffdd44, sky: 0x282010 },
+  { name: '虚空裂隙', ground: 0x4a1a6a, floor: 0x3a0a5a, accent: 0xcc66ff, sky: 0x180828 },
+  { name: '圣光残垣', ground: 0x7a6a3a, floor: 0x5a4a2a, accent: 0xffee66, sky: 0x302818 },
+  { name: '龙息巢穴', ground: 0x8a2a2a, floor: 0x6a1a1a, accent: 0xff8888, sky: 0x300808 },
+  { name: '时砂之阶', ground: 0x8a7a4a, floor: 0x6a5a3a, accent: 0xffcc66, sky: 0x302818 },
+  { name: '终焉之门', ground: 0x3a3a3a, floor: 0x2a2a2a, accent: 0xff4444, sky: 0x0a0a0a },
 ];
 
 const TOTAL_FLOORS = 10;
-const ARENA_SIZE = 28;
+const ARENA_SIZE = 24;
+const PIXEL_SCALE = 3;
 
-// ─── DOM refs ───
 const canvas = document.getElementById('game-canvas');
+const viewport = document.getElementById('game-viewport');
 const hud = document.getElementById('hud');
 const controls = document.getElementById('controls');
-const rotateHint = document.getElementById('rotate-hint');
 const screenTitle = document.getElementById('screen-title');
 const screenFloorClear = document.getElementById('screen-floor-clear');
 const screenGameover = document.getElementById('screen-gameover');
 const screenVictory = document.getElementById('screen-victory');
 
-// ─── Three.js core ───
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = false;
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 200);
-
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 120);
 const clock = new THREE.Clock();
-const raycaster = new THREE.Raycaster();
-const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-// ─── Game state ───
-let gameState = 'title'; // title | playing | floor_clear | gameover | victory
+let gameState = 'title';
 let currentFloor = 1;
 let enemies = [];
 let pickups = [];
 let particles = [];
 let floorMeshes = [];
 let bossActive = false;
-let floorBlessing = null;
 let attackCooldown = 0;
 let dodgeCooldown = 0;
 let dodgeTimer = 0;
 let invincible = 0;
-let pendingBlessing = false;
 let floorCleared = false;
+let walkAnim = 0;
 
 const player = {
   hp: 100, maxHp: 100,
@@ -67,22 +59,58 @@ const player = {
   velocity: new THREE.Vector3(),
 };
 
-// ─── Input ───
 const keys = {};
-const joystick = { active: false, x: 0, y: 0, id: null, originX: 0, originY: 0 };
+const joystick = { active: false, x: 0, y: 0, pointerId: null };
 const joystickZone = document.getElementById('joystick-zone');
 const joystickBase = document.getElementById('joystick-base');
 const joystickStick = document.getElementById('joystick-stick');
+let joyCenterX = 0;
+let joyCenterY = 0;
+const JOY_MAX = 52;
 
-// ─── Helpers ───
 function $(id) { return document.getElementById(id); }
+
+function pixelMat(color, emissive = 0) {
+  return new THREE.MeshLambertMaterial({
+    color,
+    emissive: emissive || color,
+    emissiveIntensity: emissive ? 0.15 : 0,
+    flatShading: true,
+  });
+}
+
+function makePixelTexture(c1, c2, size = 16) {
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      ctx.fillStyle = (x + y) % 2 === 0 ? `#${c1.toString(16).padStart(6, '0')}` : `#${c2.toString(16).padStart(6, '0')}`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(8, 8);
+  return tex;
+}
+
+function addVoxel(group, w, h, d, color, x, y, z) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), pixelMat(color));
+  m.position.set(x, y + h / 2, z);
+  group.add(m);
+  return m;
+}
 
 function log(msg) {
   const el = $('combat-log');
   const p = document.createElement('p');
   p.textContent = msg;
   el.prepend(p);
-  while (el.children.length > 5) el.lastChild.remove();
+  while (el.children.length > 4) el.lastChild.remove();
 }
 
 function floatDamage(text, x, y, cls = 'enemy-hit') {
@@ -92,181 +120,119 @@ function floatDamage(text, x, y, cls = 'enemy-hit') {
   el.style.left = `${x}px`;
   el.style.top = `${y}px`;
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 800);
+  setTimeout(() => el.remove(), 700);
+}
+
+function getViewportRect() {
+  return viewport.getBoundingClientRect();
 }
 
 function worldToScreen(pos) {
   const v = pos.clone();
-  v.y += 2;
+  v.y += 1.5;
   v.project(camera);
+  const rect = getViewportRect();
   return {
-    x: (v.x * 0.5 + 0.5) * window.innerWidth,
-    y: (-v.y * 0.5 + 0.5) * window.innerHeight,
+    x: rect.left + (v.x * 0.5 + 0.5) * rect.width,
+    y: rect.top + (-v.y * 0.5 + 0.5) * rect.height,
   };
 }
 
-function mobCount(floor) {
-  return 2 + Math.floor(floor / 3);
+function mobCount(floor) { return 2 + Math.floor(floor / 3); }
+function bossHp(floor) { return floor >= TOTAL_FLOORS ? 15000 : 1000 + floor * 800; }
+function mobHp(floor, elite = false) {
+  const b = 30 + floor * 25 + Math.random() * 20;
+  return elite ? b * 2.2 : b;
 }
-
-function bossHp(floor) {
-  if (floor >= TOTAL_FLOORS) return 15000;
-  return 1000 + floor * 800;
-}
-
-function mobHp(floor, isElite = false) {
-  const base = 30 + floor * 25 + Math.random() * 20;
-  return isElite ? base * 2.2 : base;
-}
-
-function mobAtk(floor) {
-  return 8 + floor * 3 + Math.random() * 4;
-}
+function mobAtk(floor) { return 8 + floor * 3 + Math.random() * 4; }
 
 function playerDamage(base = true) {
   const dmg = player.str * (base ? 1.8 : 3.5) - 2;
   const crit = Math.random() < 0.05 + player.luck * 0.005;
-  const val = Math.max(1, Math.round(dmg * (crit ? 2 : 1)));
-  return { val, crit };
+  return { val: Math.max(1, Math.round(dmg * (crit ? 2 : 1))), crit };
 }
 
 function updateHud() {
   $('hp-fill').style.width = `${(player.hp / player.maxHp) * 100}%`;
-  $('hp-text').textContent = `${Math.ceil(player.hp)} / ${player.maxHp}`;
+  $('hp-text').textContent = `${Math.ceil(player.hp)}/${player.maxHp}`;
   $('stat-lv').textContent = player.lv;
   $('stat-str').textContent = player.str;
   $('stat-spd').textContent = player.spd;
   $('stat-def').textContent = player.def;
   const zone = ZONES[Math.min(currentFloor - 1, ZONES.length - 1)];
-  $('floor-badge').textContent = currentFloor >= TOTAL_FLOORS ? '塔顶' : `第 ${currentFloor} 层`;
+  $('floor-badge').textContent = currentFloor >= TOTAL_FLOORS ? 'TOP' : `F${currentFloor}`;
   $('zone-name').textContent = zone.name;
   const alive = enemies.filter(e => e.alive).length;
   $('enemy-count').textContent = bossActive
-    ? (alive ? '⚠ 层 Boss 来袭！' : 'Boss 已击败')
-    : `剩余 ${alive} 只`;
+    ? (alive ? 'BOSS!' : 'CLEAR')
+    : `x${alive}`;
   $('rage-fill').style.width = `${player.rage}%`;
   $('btn-skill').disabled = player.rage < 100;
 }
 
-// ─── Build player mesh (third-person visible character) ───
 function createPlayerMesh() {
-  const group = new THREE.Group();
-
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.6, metalness: 0.3 });
-  const skinMat = new THREE.MeshStandardMaterial({ color: 0xfbbf9b, roughness: 0.8 });
-  const capeMat = new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.7, side: THREE.DoubleSide });
-
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.45), bodyMat);
-  torso.position.y = 1.1;
-  torso.castShadow = true;
-  group.add(torso);
-
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 12), skinMat);
-  head.position.y = 1.85;
-  head.castShadow = true;
-  group.add(head);
-
-  const helm = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.3, 6), new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 }));
-  helm.position.y = 2.15;
-  helm.rotation.x = 0.1;
-  group.add(helm);
-
-  const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.2), capeMat);
-  cape.position.set(0, 1.2, 0.35);
-  cape.rotation.x = 0.2;
-  group.add(cape);
-
-  const sword = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.15), new THREE.MeshStandardMaterial({ color: 0xc0c0c0, metalness: 0.9, roughness: 0.1 }));
-  sword.position.set(0.55, 1.2, 0);
-  sword.rotation.z = -0.3;
+  const g = new THREE.Group();
+  addVoxel(g, 0.5, 0.5, 0.35, 0xf4a460, 0, 0.5, 0); // head
+  addVoxel(g, 0.55, 0.55, 0.55, 0xf4a460, 0, 0.5, 0); // face detail
+  addVoxel(g, 0.7, 0.2, 0.75, 0xffd700, 0, 1.05, 0); // helm
+  addVoxel(g, 0.6, 0.7, 0.4, 0x4169e1, 0, 0.35, 0); // body
+  addVoxel(g, 0.5, 0.6, 0.15, 0xc0392b, 0, 0.35, 0.28); // cape
+  addVoxel(g, 0.22, 0.55, 0.22, 0x2c3e80, -0.18, 0, 0); // leg L
+  addVoxel(g, 0.22, 0.55, 0.22, 0x2c3e80, 0.18, 0, 0); // leg R
+  const sword = addVoxel(g, 0.1, 0.9, 0.12, 0xcccccc, 0.45, 0.45, 0);
   sword.name = 'sword';
-  group.add(sword);
-
-  const legGeo = new THREE.BoxGeometry(0.25, 0.6, 0.25);
-  const legL = new THREE.Mesh(legGeo, bodyMat);
-  legL.position.set(-0.2, 0.45, 0);
-  legL.castShadow = true;
-  group.add(legL);
-  const legR = new THREE.Mesh(legGeo, bodyMat);
-  legR.position.set(0.2, 0.45, 0);
-  legR.castShadow = true;
-  group.add(legR);
-
-  group.traverse(c => { if (c.isMesh) c.castShadow = true; });
-  return group;
+  addVoxel(g, 0.18, 0.12, 0.25, 0x8b6914, 0.45, 0.06, 0); // hilt
+  return g;
 }
 
 function createEnemyMesh(isBoss, color, scale = 1) {
-  const group = new THREE.Group();
-  const mat = new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.5,
-    metalness: isBoss ? 0.6 : 0.2,
-    emissive: isBoss ? new THREE.Color(color).multiplyScalar(0.15) : 0x000000,
-  });
+  const g = new THREE.Group();
+  const s = scale;
+  const dark = new THREE.Color(color).multiplyScalar(0.6).getHex();
 
   if (isBoss) {
-    const body = new THREE.Mesh(new THREE.CylinderGeometry(1.2 * scale, 1.5 * scale, 3 * scale, 8), mat);
-    body.position.y = 1.5 * scale;
-    body.castShadow = true;
-    group.add(body);
-    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.4 * scale, 1.2 * scale, 6), mat);
-    horn.position.set(0.6 * scale, 3.2 * scale, 0);
-    group.add(horn);
-    const horn2 = horn.clone();
-    horn2.position.x = -0.6 * scale;
-    group.add(horn2);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.2 * scale, 8, 8), new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2 }));
-    eye.position.set(0.35 * scale, 2.2 * scale, 0.9 * scale);
-    group.add(eye);
-    const eye2 = eye.clone();
-    eye2.position.x = -0.35 * scale;
-    group.add(eye2);
+    addVoxel(g, 2 * s, 1.5 * s, 1.5 * s, dark, 0, 0.75 * s, 0);
+    addVoxel(g, 1.6 * s, 1.2 * s, 1.2 * s, color, 0, 1.8 * s, 0);
+    addVoxel(g, 0.5 * s, 0.8 * s, 0.5 * s, color, -0.7 * s, 2.8 * s, 0);
+    addVoxel(g, 0.5 * s, 0.8 * s, 0.5 * s, color, 0.7 * s, 2.8 * s, 0);
+    addVoxel(g, 0.3 * s, 0.3 * s, 0.1 * s, 0xff0000, -0.35 * s, 2.1 * s, 0.55 * s);
+    addVoxel(g, 0.3 * s, 0.3 * s, 0.1 * s, 0xff0000, 0.35 * s, 2.1 * s, 0.55 * s);
   } else {
-    const body = new THREE.Mesh(new THREE.SphereGeometry(0.55 * scale, 10, 10), mat);
-    body.position.y = 0.65 * scale;
-    body.castShadow = true;
-    group.add(body);
-    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.2 * scale, 0.6 * scale, 4), mat);
-    spike.position.y = 1.2 * scale;
-    group.add(spike);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.1, 6, 6), new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00, emissiveIntensity: 1.5 }));
-    eye.position.set(0.2 * scale, 0.75 * scale, 0.4 * scale);
-    group.add(eye);
+    addVoxel(g, 0.9 * s, 0.5 * s, 0.9 * s, dark, 0, 0, 0);
+    addVoxel(g, 0.7 * s, 0.6 * s, 0.7 * s, color, 0, 0.55 * s, 0);
+    addVoxel(g, 0.15 * s, 0.15 * s, 0.05 * s, 0xffff00, -0.2 * s, 0.7 * s, 0.32 * s);
+    addVoxel(g, 0.15 * s, 0.15 * s, 0.05 * s, 0xffff00, 0.2 * s, 0.7 * s, 0.32 * s);
   }
 
-  // HP bar
-  const barBg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.12), new THREE.MeshBasicMaterial({ color: 0x333333 }));
-  barBg.position.y = (isBoss ? 3.8 : 1.6) * scale;
+  const barY = (isBoss ? 3.6 : 1.4) * s;
+  const barBg = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.14), new THREE.MeshBasicMaterial({ color: 0x222222 }));
+  barBg.position.y = barY;
   barBg.name = 'hpBarBg';
-  group.add(barBg);
-  const barFill = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.1), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
-  barFill.position.set(0, (isBoss ? 3.8 : 1.6) * scale, 0.01);
+  g.add(barBg);
+  const barFill = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0044 }));
+  barFill.position.set(0, barY, 0.01);
   barFill.name = 'hpBarFill';
-  group.add(barFill);
-
-  return group;
+  g.add(barFill);
+  return g;
 }
 
-function spawnParticle(pos, color, count = 8) {
+function spawnParticle(pos, color, count = 6) {
   for (let i = 0; i < count; i++) {
     const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.08, 4, 4),
+      new THREE.BoxGeometry(0.15, 0.15, 0.15),
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 })
     );
     mesh.position.copy(pos);
-    mesh.position.y += 1;
-    const vel = new THREE.Vector3(
-      (Math.random() - 0.5) * 4,
-      Math.random() * 3 + 1,
-      (Math.random() - 0.5) * 4
-    );
-    particles.push({ mesh, vel, life: 0.6 + Math.random() * 0.4 });
+    mesh.position.y += 0.8;
+    particles.push({
+      mesh,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 5, Math.random() * 4 + 1, (Math.random() - 0.5) * 5),
+      life: 0.5 + Math.random() * 0.3,
+    });
     scene.add(mesh);
   }
 }
 
-// ─── Floor building ───
 function clearFloor() {
   floorMeshes.forEach(m => scene.remove(m));
   floorMeshes = [];
@@ -281,71 +247,52 @@ function clearFloor() {
 function buildFloor(floor) {
   clearFloor();
   const zone = ZONES[Math.min(floor - 1, ZONES.length - 1)];
-  scene.background = new THREE.Color(zone.fog);
-  scene.fog = new THREE.Fog(zone.fog, 20, 70);
+  scene.background = new THREE.Color(zone.sky);
+  scene.fog = new THREE.Fog(zone.sky, 18, 55);
 
-  // Ground
+  const tex = makePixelTexture(zone.ground, zone.floor);
   const ground = new THREE.Mesh(
-    new THREE.CylinderGeometry(ARENA_SIZE, ARENA_SIZE + 2, 0.5, 32),
-    new THREE.MeshStandardMaterial({ color: zone.color, roughness: 0.9 })
+    new THREE.BoxGeometry(ARENA_SIZE * 2, 0.5, ARENA_SIZE * 2),
+    new THREE.MeshLambertMaterial({ map: tex, flatShading: true })
   );
   ground.position.y = -0.25;
-  ground.receiveShadow = true;
   scene.add(ground);
   floorMeshes.push(ground);
 
-  // Ring wall
-  const wallMat = new THREE.MeshStandardMaterial({ color: zone.color, roughness: 0.8, transparent: true, opacity: 0.6 });
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2;
-    const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.5, 4, 1.5), wallMat);
-    pillar.position.set(Math.cos(angle) * (ARENA_SIZE - 1), 2, Math.sin(angle) * (ARENA_SIZE - 1));
-    pillar.castShadow = true;
+  const wallMat = pixelMat(zone.floor);
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.2, 3, 1.2), wallMat);
+    pillar.position.set(Math.cos(a) * (ARENA_SIZE - 1), 1.5, Math.sin(a) * (ARENA_SIZE - 1));
     scene.add(pillar);
     floorMeshes.push(pillar);
   }
 
-  // Stairs marker (next floor)
-  const stairMat = new THREE.MeshStandardMaterial({ color: zone.accent, emissive: zone.accent, emissiveIntensity: 0.3 });
-  const stairs = new THREE.Mesh(new THREE.BoxGeometry(3, 0.3, 3), stairMat);
-  stairs.position.set(0, 0.15, -ARENA_SIZE + 4);
+  const stairs = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.4, 2.5), pixelMat(zone.accent, zone.accent));
+  stairs.position.set(0, 0.2, -ARENA_SIZE + 3);
   stairs.name = 'stairs';
   stairs.visible = false;
   scene.add(stairs);
   floorMeshes.push(stairs);
 
-  // Lights
+  for (let i = 0; i < 5; i++) {
+    const gem = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), pixelMat(zone.accent, zone.accent));
+    const a = Math.random() * Math.PI * 2;
+    gem.position.set(Math.cos(a) * (6 + Math.random() * 8), 0.3, Math.sin(a) * (6 + Math.random() * 8));
+    scene.add(gem);
+    floorMeshes.push(gem);
+  }
+
   if (!scene.userData.lit) {
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-    sun.position.set(15, 30, 10);
-    sun.castShadow = true;
-    sun.shadow.mapSize.set(1024, 1024);
-    sun.shadow.camera.near = 1;
-    sun.shadow.camera.far = 80;
-    sun.shadow.camera.left = -30;
-    sun.shadow.camera.right = 30;
-    sun.shadow.camera.top = 30;
-    sun.shadow.camera.bottom = -30;
+    scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const sun = new THREE.DirectionalLight(0xffffff, 0.6);
+    sun.position.set(10, 20, 8);
     scene.add(sun);
     scene.userData.lit = true;
   }
 
-  // Decorative crystals
-  for (let i = 0; i < 6; i++) {
-    const c = new THREE.Mesh(
-      new THREE.OctahedronGeometry(0.5 + Math.random() * 0.5),
-      new THREE.MeshStandardMaterial({ color: zone.accent, emissive: zone.accent, emissiveIntensity: 0.5, transparent: true, opacity: 0.8 })
-    );
-    const a = Math.random() * Math.PI * 2;
-    const r = 8 + Math.random() * 10;
-    c.position.set(Math.cos(a) * r, 0.5, Math.sin(a) * r);
-    scene.add(c);
-    floorMeshes.push(c);
-  }
-
   spawnMobs(floor);
-  player.position.set(0, 0, ARENA_SIZE - 6);
+  player.position.set(0, 0, ARENA_SIZE - 5);
   if (player.mesh) {
     player.mesh.position.copy(player.position);
     player.mesh.rotation.y = player.rotation;
@@ -356,210 +303,148 @@ function spawnMobs(floor) {
   const zone = ZONES[Math.min(floor - 1, ZONES.length - 1)];
   const count = mobCount(floor);
   for (let i = 0; i < count; i++) {
-    const isElite = Math.random() < 0.15;
-    const angle = Math.random() * Math.PI * 2;
-    const r = 4 + Math.random() * (ARENA_SIZE - 8);
-    const mesh = createEnemyMesh(false, isElite ? 0xffd700 : zone.accent, isElite ? 1.3 : 1);
-    mesh.position.set(Math.cos(angle) * r, 0, Math.sin(angle) * r);
+    const elite = Math.random() < 0.15;
+    const a = Math.random() * Math.PI * 2;
+    const r = 3 + Math.random() * (ARENA_SIZE - 7);
+    const mesh = createEnemyMesh(false, elite ? 0xffd700 : zone.accent, elite ? 1.25 : 1);
+    mesh.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
     scene.add(mesh);
-    enemies.push({
-      mesh,
-      alive: true,
-      isBoss: false,
-      isElite,
-      hp: mobHp(floor, isElite),
-      maxHp: mobHp(floor, isElite),
-      atk: mobAtk(floor),
-      atkCd: 0,
-      speed: 2.5 + floor * 0.15,
-    });
+    const hp = mobHp(floor, elite);
+    enemies.push({ mesh, alive: true, isBoss: false, isElite: elite, hp, maxHp: hp, atk: mobAtk(floor), atkCd: 0, speed: 2.8 + floor * 0.18 });
   }
-  log(`进入${zone.name}，遭遇 ${count} 只小怪兽！`);
+  log(`${zone.name} ${count}怪`);
 }
 
 function spawnBoss(floor) {
   bossActive = true;
   const zone = ZONES[Math.min(floor - 1, ZONES.length - 1)];
   const isFinal = floor >= TOTAL_FLOORS;
-  const scale = isFinal ? 2 : 1.4;
-  const mesh = createEnemyMesh(true, isFinal ? 0xff0000 : zone.accent, scale);
-  mesh.position.set(0, 0, -5);
+  const mesh = createEnemyMesh(true, isFinal ? 0xff0044 : zone.accent, isFinal ? 1.8 : 1.3);
+  mesh.position.set(0, 0, -4);
   scene.add(mesh);
   const hp = bossHp(floor);
-  enemies.push({
-    mesh,
-    alive: true,
-    isBoss: true,
-    isFinal,
-    hp,
-    maxHp: hp,
-    atk: 12 + floor * 5,
-    atkCd: 0,
-    speed: 2 + floor * 0.1,
-    phase: 1,
-    summonCd: 3,
-  });
-  log(isFinal ? '⚠ 塔顶守护者降临！' : `⚠ 第 ${floor} 层 Boss 现身！`);
+  enemies.push({ mesh, alive: true, isBoss: true, isFinal, hp, maxHp: hp, atk: 12 + floor * 5, atkCd: 0, speed: 2.2 + floor * 0.1, phase: 1, summonCd: 3 });
+  log(isFinal ? '塔顶BOSS!' : `F${floor} BOSS!`);
   updateHud();
 }
 
 function updateEnemyHpBar(enemy) {
   const fill = enemy.mesh.getObjectByName('hpBarFill');
   if (fill) {
-    const ratio = enemy.hp / enemy.maxHp;
-    fill.scale.x = Math.max(0.01, ratio);
-    fill.position.x = -(1.2 * (1 - ratio)) / 2;
+    const r = enemy.hp / enemy.maxHp;
+    fill.scale.x = Math.max(0.01, r);
+    fill.position.x = -(1.4 * (1 - r)) / 2;
   }
 }
 
-// ─── Combat ───
 function dealDamageToEnemy(enemy, dmg, isCrit) {
   if (!enemy.alive) return;
   enemy.hp -= dmg;
   updateEnemyHpBar(enemy);
-  spawnParticle(enemy.mesh.position, enemy.isBoss ? 0xff4500 : 0xffd700, isCrit ? 12 : 5);
+  spawnParticle(enemy.mesh.position, enemy.isBoss ? 0xff0044 : 0xffd700, isCrit ? 10 : 4);
   const scr = worldToScreen(enemy.mesh.position);
-  floatDamage(isCrit ? `暴击! ${dmg}` : `${dmg}`, scr.x, scr.y, isCrit ? 'crit' : 'enemy-hit');
+  floatDamage(isCrit ? `${dmg}!` : `${dmg}`, scr.x, scr.y, isCrit ? 'crit' : 'enemy-hit');
 
   if (enemy.hp <= 0) {
     enemy.alive = false;
     enemy.mesh.visible = false;
     player.rage = Math.min(100, player.rage + (enemy.isBoss ? 40 : 10));
-    const expGain = enemy.isBoss ? 80 + currentFloor * 20 : 15 + currentFloor * 3;
-    gainExp(expGain);
-
-    if (!enemy.isBoss && Math.random() < 0.08 + player.luck * 0.005) {
-      spawnPickup(enemy.mesh.position.clone());
-    }
-
-    if (enemy.isBoss) {
-      onBossDefeated();
-    } else {
-      checkAllMobsDead();
-    }
+    gainExp(enemy.isBoss ? 80 + currentFloor * 20 : 15 + currentFloor * 3);
+    if (!enemy.isBoss && Math.random() < 0.08 + player.luck * 0.005) spawnPickup(enemy.mesh.position.clone());
+    if (enemy.isBoss) onBossDefeated();
+    else checkAllMobsDead();
   }
   updateHud();
 }
 
 function checkAllMobsDead() {
-  const mobsLeft = enemies.filter(e => e.alive && !e.isBoss).length;
-  if (mobsLeft === 0 && !bossActive) {
-    log('小怪清空！Boss 即将出现…');
-    setTimeout(() => spawnBoss(currentFloor), 1200);
+  if (enemies.filter(e => e.alive && !e.isBoss).length === 0 && !bossActive) {
+    log('BOSS来咯');
+    setTimeout(() => spawnBoss(currentFloor), 1000);
   }
 }
 
 function onBossDefeated() {
   if (floorCleared) return;
   floorCleared = true;
-
   const stairs = floorMeshes.find(m => m.name === 'stairs');
   if (stairs) stairs.visible = true;
+  if (currentFloor >= TOTAL_FLOORS) { setTimeout(showVictory, 1200); return; }
 
-  if (currentFloor >= TOTAL_FLOORS) {
-    setTimeout(() => showVictory(), 1500);
-    return;
-  }
-
-  pendingBlessing = currentFloor % 5 === 0;
-  $('floor-clear-title').textContent = `第 ${currentFloor} 层 通关！`;
-  $('floor-clear-reward').textContent = `获得经验 ${80 + currentFloor * 20} · 金币 +${50 + currentFloor * 10}`;
-
+  $('floor-clear-title').textContent = `F${currentFloor} CLEAR!`;
+  $('floor-clear-reward').textContent = `EXP+${80 + currentFloor * 20} GOLD+${50 + currentFloor * 10}`;
   const blessEl = $('blessing-choices');
   blessEl.innerHTML = '';
-  if (pendingBlessing) {
+  if (currentFloor % 5 === 0) {
     blessEl.classList.remove('hidden');
-    const options = [
-      { label: '🗡 力量 +3', apply: () => { player.str += 3; } },
-      { label: '💨 速度 +3', apply: () => { player.spd += 3; } },
-      { label: '❤ 恢复 30 HP', apply: () => { player.hp = Math.min(player.maxHp, player.hp + 30); } },
-    ];
-    options.forEach(opt => {
+    [
+      { label: 'ATK+3', fn: () => { player.str += 3; } },
+      { label: 'SPD+3', fn: () => { player.spd += 3; } },
+      { label: 'HP+30', fn: () => { player.hp = Math.min(player.maxHp, player.hp + 30); } },
+    ].forEach(o => {
       const btn = document.createElement('button');
       btn.className = 'bless-btn';
-      btn.textContent = opt.label;
-      btn.onclick = () => { opt.apply(); floorBlessing = opt.label; updateHud(); };
+      btn.textContent = o.label;
+      btn.onclick = () => { o.fn(); updateHud(); };
       blessEl.appendChild(btn);
     });
-  } else {
-    blessEl.classList.add('hidden');
-  }
+  } else blessEl.classList.add('hidden');
 
   gameState = 'floor_clear';
   screenFloorClear.classList.remove('hidden');
 }
 
-function gainExp(amount) {
-  player.exp += amount;
+function gainExp(n) {
+  player.exp += n;
   while (player.exp >= player.expNext) {
     player.exp -= player.expNext;
     player.lv++;
-    player.str += 1;
-    player.spd += 1;
-    player.def += 1;
-    player.luck += 1;
+    player.str++; player.spd++; player.def++; player.luck++;
     player.expNext = Math.floor(player.expNext * 1.3);
-    log(`升级！Lv.${player.lv} 全属性 +1`);
+    log(`LV UP! ${player.lv}`);
   }
 }
 
 function spawnPickup(pos) {
-  const mesh = new THREE.Mesh(
-    new THREE.OctahedronGeometry(0.35),
-    new THREE.MeshStandardMaterial({ color: 0x60a5fa, emissive: 0x3b82f6, emissiveIntensity: 0.8 })
-  );
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), pixelMat(0x41a6f6, 0x41a6f6));
   mesh.position.copy(pos);
-  mesh.position.y = 0.5;
+  mesh.position.y = 0.4;
   scene.add(mesh);
-  pickups.push({ mesh, bob: Math.random() * Math.PI * 2 });
+  pickups.push({ mesh, bob: Math.random() * 6.28 });
 }
 
 function playerAttack(isUlt = false) {
   if (attackCooldown > 0 && !isUlt) return;
-  attackCooldown = isUlt ? 0.8 : Math.max(0.25, 0.6 - player.spd * 0.02);
+  attackCooldown = isUlt ? 0.7 : Math.max(0.18, 0.45 - player.spd * 0.015);
+  const sword = player.mesh?.getObjectByName('sword');
+  if (sword) { sword.rotation.z = -1; setTimeout(() => { sword.rotation.z = 0; }, 120); }
 
-  const sword = player.mesh.getObjectByName('sword');
-  if (sword) {
-    sword.rotation.z = -1.2;
-    setTimeout(() => { if (sword) sword.rotation.z = -0.3; }, 150);
-  }
-
-  const range = isUlt ? 6 : 2.8;
-  const angle = player.rotation;
-  const forward = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
-
+  const range = isUlt ? 5.5 : 2.6;
+  const fwd = new THREE.Vector3(Math.sin(player.rotation), 0, Math.cos(player.rotation));
   enemies.forEach(enemy => {
     if (!enemy.alive) return;
-    const toEnemy = enemy.mesh.position.clone().sub(player.position);
-    toEnemy.y = 0;
-    const dist = toEnemy.length();
+    const to = enemy.mesh.position.clone().sub(player.position);
+    to.y = 0;
+    const dist = to.length();
     if (dist > range) return;
-    toEnemy.normalize();
-    if (forward.dot(toEnemy) > (isUlt ? -0.2 : 0.3)) {
+    to.normalize();
+    if (fwd.dot(to) > (isUlt ? -0.1 : 0.25)) {
       const { val, crit } = playerDamage(!isUlt);
-      const dmg = isUlt ? val * 3 : val;
-      const bossBonus = enemy.isBoss ? 1.15 : 1;
-      dealDamageToEnemy(enemy, Math.round(dmg * bossBonus), crit || isUlt);
+      dealDamageToEnemy(enemy, Math.round((isUlt ? val * 3 : val) * (enemy.isBoss ? 1.15 : 1)), crit || isUlt);
     }
   });
-
-  if (isUlt) {
-    player.rage = 0;
-    log('必杀技！');
-    spawnParticle(player.position, 0xffd700, 20);
-  }
-
-  player.rage = Math.min(100, player.rage + 5);
+  if (isUlt) { player.rage = 0; spawnParticle(player.position, 0xffd700, 16); log('必杀!'); }
+  else player.rage = Math.min(100, player.rage + 5);
   updateHud();
 }
 
 function playerDodge() {
   if (dodgeCooldown > 0) return;
-  dodgeCooldown = Math.max(0.8, 1.5 - player.spd * 0.03);
-  dodgeTimer = 0.25;
-  invincible = 0.3;
-  const forward = new THREE.Vector3(Math.sin(player.rotation), 0, Math.cos(player.rotation));
-  player.velocity.copy(forward.multiplyScalar(12));
+  dodgeCooldown = Math.max(0.6, 1.2 - player.spd * 0.025);
+  dodgeTimer = 0.22;
+  invincible = 0.28;
+  const fwd = new THREE.Vector3(Math.sin(player.rotation), 0, Math.cos(player.rotation));
+  player.velocity.copy(fwd.multiplyScalar(14));
 }
 
 function damagePlayer(amount) {
@@ -567,58 +452,34 @@ function damagePlayer(amount) {
   const reduced = Math.max(1, amount - player.def * 0.5);
   player.hp -= reduced;
   player.rage = Math.min(100, player.rage + 8);
-  invincible = 0.4;
-  spawnParticle(player.position, 0xef4444, 6);
+  invincible = 0.35;
+  spawnParticle(player.position, 0xff0044, 5);
   const scr = worldToScreen(player.position);
   floatDamage(`-${Math.round(reduced)}`, scr.x, scr.y, 'player-hit');
   updateHud();
-
-  if (player.hp <= 0) {
-    player.hp = 0;
-    showGameover();
-  }
+  if (player.hp <= 0) { player.hp = 0; showGameover(); }
 }
 
-// ─── Game flow ───
 function startGame() {
   currentFloor = 1;
-  player.hp = 100;
-  player.maxHp = 100;
-  player.lv = 1;
-  player.exp = 0;
-  player.expNext = 50;
-  player.str = 10;
-  player.spd = 10;
-  player.def = 5;
-  player.luck = 5;
-  player.rage = 0;
-  floorBlessing = null;
-
-  if (!player.mesh) {
-    player.mesh = createPlayerMesh();
-    scene.add(player.mesh);
-  }
-
+  Object.assign(player, { hp: 100, maxHp: 100, lv: 1, exp: 0, expNext: 50, str: 10, spd: 10, def: 5, luck: 5, rage: 0 });
+  if (!player.mesh) { player.mesh = createPlayerMesh(); scene.add(player.mesh); }
   screenTitle.classList.add('hidden');
   screenGameover.classList.add('hidden');
   screenVictory.classList.add('hidden');
   screenFloorClear.classList.add('hidden');
   hud.classList.remove('hidden');
   controls.classList.remove('hidden');
-  $('rage-bar').classList.remove('hidden');
-
   gameState = 'playing';
   buildFloor(currentFloor);
   updateHud();
+  updateJoyCenter();
 }
 
 function nextFloor() {
   screenFloorClear.classList.add('hidden');
   currentFloor++;
-  if (currentFloor > TOTAL_FLOORS) {
-    showVictory();
-    return;
-  }
+  if (currentFloor > TOTAL_FLOORS) { showVictory(); return; }
   gameState = 'playing';
   buildFloor(currentFloor);
   updateHud();
@@ -626,14 +487,13 @@ function nextFloor() {
 
 function restAtCamp() {
   player.hp = Math.min(player.maxHp, player.hp + 30);
-  log('营地休整，恢复 30 HP');
   updateHud();
   nextFloor();
 }
 
 function showGameover() {
   gameState = 'gameover';
-  $('gameover-floor').textContent = `最高到达：第 ${currentFloor} 层 · Lv.${player.lv}`;
+  $('gameover-floor').textContent = `F${currentFloor} Lv${player.lv}`;
   screenGameover.classList.remove('hidden');
 }
 
@@ -644,13 +504,9 @@ function showVictory() {
   screenVictory.classList.remove('hidden');
 }
 
-// ─── Update loop ───
 function getMoveInput() {
   let mx = 0, mz = 0;
-  if (joystick.active) {
-    mx = joystick.x;
-    mz = joystick.y;
-  }
+  if (joystick.active) { mx = joystick.x; mz = joystick.y; }
   if (keys['KeyW'] || keys['ArrowUp']) mz -= 1;
   if (keys['KeyS'] || keys['ArrowDown']) mz += 1;
   if (keys['KeyA'] || keys['ArrowLeft']) mx -= 1;
@@ -660,104 +516,90 @@ function getMoveInput() {
 
 function updatePlayer(dt) {
   if (gameState !== 'playing') return;
-
   attackCooldown = Math.max(0, attackCooldown - dt);
   dodgeCooldown = Math.max(0, dodgeCooldown - dt);
   dodgeTimer = Math.max(0, dodgeTimer - dt);
   invincible = Math.max(0, invincible - dt);
 
   const move = getMoveInput();
-  const speed = 7 + player.spd * 0.15;
+  const speed = 9 + player.spd * 0.2;
 
   if (move.lengthSq() > 0.01) {
     move.normalize();
     player.rotation = Math.atan2(move.x, move.y);
     player.velocity.x = move.x * speed;
     player.velocity.z = move.y * speed;
+    walkAnim += dt * 12;
   } else if (dodgeTimer <= 0) {
-    player.velocity.multiplyScalar(0.85);
+    player.velocity.multiplyScalar(0.8);
   }
 
   player.position.x += player.velocity.x * dt;
   player.position.z += player.velocity.z * dt;
-
-  const limit = ARENA_SIZE - 2;
-  player.position.x = THREE.MathUtils.clamp(player.position.x, -limit, limit);
-  player.position.z = THREE.MathUtils.clamp(player.position.z, -limit, limit);
+  const lim = ARENA_SIZE - 2;
+  player.position.x = THREE.MathUtils.clamp(player.position.x, -lim, lim);
+  player.position.z = THREE.MathUtils.clamp(player.position.z, -lim, lim);
 
   player.mesh.position.copy(player.position);
   player.mesh.rotation.y = player.rotation;
+  if (player.mesh.children[4]) player.mesh.children[4].position.y = 0.35 + Math.sin(walkAnim) * 0.04;
 
-  // Pickups
+  if (invincible > 0 && player.mesh) player.mesh.visible = Math.floor(invincible * 20) % 2 === 0;
+  else if (player.mesh) player.mesh.visible = true;
+
   pickups.forEach((p, i) => {
-    p.bob += dt * 3;
-    p.mesh.position.y = 0.5 + Math.sin(p.bob) * 0.15;
-    p.mesh.rotation.y += dt * 2;
-    if (p.mesh.position.distanceTo(player.position) < 1.5) {
-      const bonus = ['str', 'spd', 'def', 'luck'][Math.floor(Math.random() * 4)];
-      player[bonus] += 2;
+    p.bob += dt * 4;
+    p.mesh.position.y = 0.4 + Math.sin(p.bob) * 0.1;
+    p.mesh.rotation.y += dt * 3;
+    if (p.mesh.position.distanceTo(player.position) < 1.4) {
+      const k = ['str', 'spd', 'def', 'luck'][Math.floor(Math.random() * 4)];
+      player[k] += 2;
       player.hp = Math.min(player.maxHp, player.hp + 10);
-      log(`获得装备！${bonus === 'str' ? '力量' : bonus === 'spd' ? '速度' : bonus === 'def' ? '防御' : '幸运'} +2`);
+      log('装备+');
       scene.remove(p.mesh);
       pickups.splice(i, 1);
       updateHud();
     }
   });
-
 }
 
 function updateEnemies(dt) {
   if (gameState !== 'playing') return;
-
   enemies.forEach(enemy => {
     if (!enemy.alive) return;
-
     enemy.mesh.getObjectByName('hpBarBg')?.lookAt(camera.position);
     enemy.mesh.getObjectByName('hpBarFill')?.lookAt(camera.position);
-
-    const toPlayer = player.position.clone().sub(enemy.mesh.position);
-    toPlayer.y = 0;
-    const dist = toPlayer.length();
-    if (dist < 0.5) return;
-
-    toPlayer.normalize();
-    enemy.mesh.lookAt(player.position.x, enemy.mesh.position.y, player.position.z);
-
-    if (dist > (enemy.isBoss ? 2.5 : 1.2)) {
-      enemy.mesh.position.add(toPlayer.multiplyScalar(enemy.speed * dt));
-    }
+    const to = player.position.clone().sub(enemy.mesh.position);
+    to.y = 0;
+    const dist = to.length();
+    if (dist < 0.4) return;
+    to.normalize();
+    enemy.mesh.rotation.y = Math.atan2(to.x, to.z);
+    if (dist > (enemy.isBoss ? 2.2 : 1.0)) enemy.mesh.position.add(to.multiplyScalar(enemy.speed * dt));
 
     enemy.atkCd -= dt;
-    const atkRange = enemy.isBoss ? 3.5 : 1.8;
-    if (dist < atkRange && enemy.atkCd <= 0) {
-      enemy.atkCd = enemy.isBoss ? 1.2 : 1.5 + Math.random() * 0.5;
+    if (dist < (enemy.isBoss ? 3.2 : 1.6) && enemy.atkCd <= 0) {
+      enemy.atkCd = enemy.isBoss ? 1.0 : 1.3 + Math.random() * 0.4;
       damagePlayer(enemy.atk * (enemy.isBoss ? 1.3 : 1));
-
-      if (enemy.isBoss) {
+      if (enemy.isBoss && !enemy.isFinal) {
         enemy.summonCd = (enemy.summonCd || 3) - dt;
-        if (enemy.summonCd <= 0 && !enemy.isFinal) {
+        if (enemy.summonCd <= 0) {
           enemy.summonCd = 5;
-          log('Boss 召唤小喽啰！');
-          const mesh = createEnemyMesh(false, 0xff6b6b);
+          const mesh = createEnemyMesh(false, 0xff6622);
           mesh.position.copy(enemy.mesh.position);
-          mesh.position.x += 2;
+          mesh.position.x += 1.5;
           scene.add(mesh);
-          enemies.push({
-            mesh, alive: true, isBoss: false, hp: mobHp(currentFloor) * 0.5,
-            maxHp: mobHp(currentFloor) * 0.5, atk: mobAtk(currentFloor) * 0.7,
-            atkCd: 1, speed: 3,
-          });
+          const hp = mobHp(currentFloor) * 0.5;
+          enemies.push({ mesh, alive: true, isBoss: false, hp, maxHp: hp, atk: mobAtk(currentFloor) * 0.7, atkCd: 1, speed: 3.2 });
         }
-
-        const ratio = enemy.hp / enemy.maxHp;
-        if (enemy.isFinal) {
-          if (ratio < 0.3 && enemy.phase < 3) { enemy.phase = 3; enemy.atk *= 1.5; log('塔顶 Boss 第三形态！'); }
-          else if (ratio < 0.6 && enemy.phase < 2) { enemy.phase = 2; enemy.atk *= 1.3; log('塔顶 Boss 第二形态！'); }
-        }
+      }
+      if (enemy.isFinal) {
+        const r = enemy.hp / enemy.maxHp;
+        if (r < 0.3 && enemy.phase < 3) { enemy.phase = 3; enemy.atk *= 1.5; log('P3!'); }
+        else if (r < 0.6 && enemy.phase < 2) { enemy.phase = 2; enemy.atk *= 1.3; log('P2!'); }
       }
     }
   });
-
   updateHud();
 }
 
@@ -765,108 +607,102 @@ function updateParticles(dt) {
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.life -= dt;
-    p.mesh.position.add(p.vel.clone().multiplyScalar(dt));
-    p.vel.y -= 9.8 * dt;
-    p.mesh.material.opacity = p.life;
-    if (p.life <= 0) {
-      scene.remove(p.mesh);
-      particles.splice(i, 1);
-    }
+    p.mesh.position.addScaledVector(p.vel, dt);
+    p.vel.y -= 12 * dt;
+    p.mesh.material.opacity = Math.max(0, p.life);
+    if (p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
   }
 }
 
 function updateCamera() {
   if (!player.mesh) return;
-  const offset = new THREE.Vector3(
-    -Math.sin(player.rotation) * 9,
-    7,
-    -Math.cos(player.rotation) * 9
-  );
+  const dist = 7.5;
+  const height = 8;
+  const off = new THREE.Vector3(-Math.sin(player.rotation) * dist, height, -Math.cos(player.rotation) * dist);
   const target = player.position.clone();
-  target.y += 1.5;
-  const desired = target.clone().add(offset);
-  camera.position.lerp(desired, 0.08);
-  camera.lookAt(target.x, target.y - 0.5, target.z);
+  target.y += 1.2;
+  camera.position.lerp(target.clone().add(off), 0.1);
+  camera.lookAt(target.x, target.y - 0.3, target.z);
 }
 
 function resize() {
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const w = viewport.clientWidth;
+  const h = viewport.clientHeight;
+  if (w === 0 || h === 0) return;
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  renderer.setSize(w, h, false);
-
-  if (window.innerWidth < window.innerHeight && window.innerWidth < 900) {
-    rotateHint.classList.remove('hidden');
-  } else {
-    rotateHint.classList.add('hidden');
-  }
+  renderer.setSize(Math.floor(w / PIXEL_SCALE), Math.floor(h / PIXEL_SCALE), false);
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
 }
 
-function animate() {
-  requestAnimationFrame(animate);
-  const dt = Math.min(clock.getDelta(), 0.05);
-  updatePlayer(dt);
-  updateEnemies(dt);
-  updateParticles(dt);
-  updateCamera();
-  renderer.render(scene, camera);
+function updateJoyCenter() {
+  const rect = joystickBase.getBoundingClientRect();
+  joyCenterX = rect.left + rect.width / 2;
+  joyCenterY = rect.top + rect.height / 2;
 }
 
-// ─── Input setup ───
+function setJoystick(dx, dy) {
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > JOY_MAX) { dx = (dx / dist) * JOY_MAX; dy = (dy / dist) * JOY_MAX; }
+  joystick.x = dx / JOY_MAX;
+  joystick.y = dy / JOY_MAX;
+  joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+}
+
+function resetJoystick() {
+  joystick.active = false;
+  joystick.x = 0;
+  joystick.y = 0;
+  joystick.pointerId = null;
+  joystickStick.style.transform = 'translate(0, 0)';
+}
+
 function setupJoystick() {
-  const maxDist = 40;
-
-  function start(e) {
+  function onStart(e) {
     if (gameState !== 'playing') return;
     e.preventDefault();
-    const touch = e.touches ? e.touches[0] : e;
-    joystick.id = touch.identifier ?? 'mouse';
+    updateJoyCenter();
+    const pt = e.changedTouches ? e.changedTouches[0] : e;
+    joystick.pointerId = pt.identifier ?? 1;
     joystick.active = true;
-    joystick.originX = touch.clientX;
-    joystick.originY = touch.clientY;
-    joystickBase.classList.add('active');
-    joystickBase.style.left = `${touch.clientX - 55}px`;
-    joystickBase.style.top = `${touch.clientY - 55}px`;
-    joystickBase.style.bottom = 'auto';
-    joystickStick.style.transform = 'translate(0, 0)';
+    setJoystick(pt.clientX - joyCenterX, pt.clientY - joyCenterY);
   }
 
-  function move(e) {
+  function onMove(e) {
     if (!joystick.active) return;
     e.preventDefault();
-    const touch = e.touches
-      ? Array.from(e.touches).find(t => t.identifier === joystick.id) || e.touches[0]
-      : e;
-    let dx = touch.clientX - joystick.originX;
-    let dy = touch.clientY - joystick.originY;
-    const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist > maxDist) { dx = (dx / dist) * maxDist; dy = (dy / dist) * maxDist; }
-    joystick.x = dx / maxDist;
-    joystick.y = dy / maxDist;
-    joystickStick.style.transform = `translate(${dx}px, ${dy}px)`;
+    let pt = e;
+    if (e.changedTouches || e.touches) {
+      const list = e.touches.length ? e.touches : e.changedTouches;
+      pt = Array.from(list).find(t => t.identifier === joystick.pointerId) || list[0];
+    }
+    setJoystick(pt.clientX - joyCenterX, pt.clientY - joyCenterY);
   }
 
-  function end(e) {
+  function onEnd(e) {
     if (!joystick.active) return;
-    joystick.active = false;
-    joystick.x = 0;
-    joystick.y = 0;
-    joystick.id = null;
-    joystickBase.classList.remove('active');
-    joystickStick.style.transform = 'translate(0, 0)';
+    if (e.changedTouches) {
+      const ended = Array.from(e.changedTouches).some(t => t.identifier === joystick.pointerId);
+      if (!ended && e.touches.length > 0) return;
+    }
+    resetJoystick();
   }
 
-  joystickZone.addEventListener('touchstart', start, { passive: false });
-  joystickZone.addEventListener('touchmove', move, { passive: false });
-  joystickZone.addEventListener('touchend', end);
-  joystickZone.addEventListener('touchcancel', end);
-  joystickZone.addEventListener('mousedown', start);
-  window.addEventListener('mousemove', move);
-  window.addEventListener('mouseup', end);
+  joystickZone.addEventListener('touchstart', onStart, { passive: false });
+  joystickZone.addEventListener('touchmove', onMove, { passive: false });
+  joystickZone.addEventListener('touchend', onEnd);
+  joystickZone.addEventListener('touchcancel', onEnd);
+  joystickZone.addEventListener('mousedown', onStart);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
 }
 
 function setupButtons() {
+  const bind = (el, fn) => {
+    el.addEventListener('touchstart', e => { e.preventDefault(); fn(); }, { passive: false });
+    el.addEventListener('click', e => { e.preventDefault(); fn(); });
+  };
   $('btn-start').onclick = startGame;
   $('btn-retry').onclick = startGame;
   $('btn-victory-restart').onclick = () => {
@@ -877,13 +713,9 @@ function setupButtons() {
   };
   $('btn-next-floor').onclick = nextFloor;
   $('btn-rest').onclick = restAtCamp;
-
-  $('btn-attack').addEventListener('touchstart', e => { e.preventDefault(); playerAttack(false); });
-  $('btn-attack').addEventListener('mousedown', e => { e.preventDefault(); playerAttack(false); });
-  $('btn-skill').addEventListener('touchstart', e => { e.preventDefault(); if (player.rage >= 100) playerAttack(true); });
-  $('btn-skill').addEventListener('mousedown', e => { e.preventDefault(); if (player.rage >= 100) playerAttack(true); });
-  $('btn-dodge').addEventListener('touchstart', e => { e.preventDefault(); playerDodge(); });
-  $('btn-dodge').addEventListener('mousedown', e => { e.preventDefault(); playerDodge(); });
+  bind($('btn-attack'), () => playerAttack(false));
+  bind($('btn-skill'), () => { if (player.rage >= 100) playerAttack(true); });
+  bind($('btn-dodge'), () => playerDodge());
 
   window.addEventListener('keydown', e => {
     keys[e.code] = true;
@@ -894,9 +726,20 @@ function setupButtons() {
   window.addEventListener('keyup', e => { keys[e.code] = false; });
 }
 
-// ─── Init ───
 setupJoystick();
 setupButtons();
-window.addEventListener('resize', resize);
+window.addEventListener('resize', () => { resize(); updateJoyCenter(); });
+new ResizeObserver(() => { resize(); updateJoyCenter(); }).observe(viewport);
 resize();
+updateJoyCenter();
 animate();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  updatePlayer(dt);
+  updateEnemies(dt);
+  updateParticles(dt);
+  updateCamera();
+  renderer.render(scene, camera);
+}
