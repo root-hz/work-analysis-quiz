@@ -19,6 +19,21 @@ body[data-theme="red"] {
   --primary-dark: #991b1b;
 }
 
+body[data-theme="green"] {
+  --primary: #059669;
+  --primary-dark: #047857;
+}
+
+body[data-theme="purple"] {
+  --primary: #7c3aed;
+  --primary-dark: #6d28d9;
+}
+
+body[data-theme="amber"] {
+  --primary: #d97706;
+  --primary-dark: #b45309;
+}
+
 body[data-theme="red"] .badge {
   background: #fee2e2;
   color: var(--primary);
@@ -152,6 +167,18 @@ html, body {
   border-left: 4px solid #b91c1c;
 }
 
+.quiz-card-green {
+  border-left: 4px solid #059669;
+}
+
+.quiz-card-purple {
+  border-left: 4px solid #7c3aed;
+}
+
+.quiz-card-amber {
+  border-left: 4px solid #d97706;
+}
+
 .quiz-card .card-icon {
   font-size: 32px;
   margin-bottom: 8px;
@@ -201,6 +228,30 @@ html, body {
 
 .quiz-card-red .card-action {
   color: #b91c1c;
+}
+
+.quiz-card-green .card-action { color: #059669; }
+.quiz-card-purple .card-action { color: #7c3aed; }
+.quiz-card-amber .card-action { color: #d97706; }
+
+body[data-theme="green"] .badge,
+body[data-theme="purple"] .badge,
+body[data-theme="amber"] .badge {
+  background: color-mix(in srgb, var(--primary) 12%, white);
+  color: var(--primary);
+}
+
+body[data-theme="green"] .option-btn.selected,
+body[data-theme="purple"] .option-btn.selected,
+body[data-theme="amber"] .option-btn.selected {
+  background: color-mix(in srgb, var(--primary) 8%, white);
+}
+
+body[data-theme="green"] .score-circle,
+body[data-theme="purple"] .score-circle,
+body[data-theme="amber"] .score-circle {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 8px 32px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 .btn-back {

@@ -25,4 +25,43 @@ window.QUIZ_SETS = {
     ],
     questions: () => window.MARXISM_QUIZ_DATA,
   },
+  'english-listening': {
+    id: 'english-listening',
+    title: '英语听力',
+    subtitle: 'Unit 1/4/5/8 · 共 51 题',
+    icon: '🎧',
+    theme: 'green',
+    info: [
+      '四级听力选择题',
+      '答错即时显示正确答案',
+      '链接: ?quiz=english-listening',
+    ],
+    questions: () => window.ENGLISH_LISTENING_DATA,
+  },
+  'english-reading': {
+    id: 'english-reading',
+    title: '英语阅读理解',
+    subtitle: '课外阅读 · 共 40 题',
+    icon: '📰',
+    theme: 'purple',
+    info: [
+      '单选题 · 篇章理解',
+      '答错即时显示正确答案',
+      '链接: ?quiz=english-reading',
+    ],
+    questions: () => window.ENGLISH_READING_DATA,
+  },
+  'english-vocabulary': {
+    id: 'english-vocabulary',
+    title: '英语词汇题',
+    subtitle: '综合教程 ABC · 共 79 题',
+    icon: '🔤',
+    theme: 'amber',
+    info: [
+      '词汇选择 · 词义辨析 · 填空',
+      '答错即时显示正确答案',
+      '链接: ?quiz=english-vocabulary',
+    ],
+    questions: () => window.ENGLISH_VOCABULARY_DATA,
+  },
 };

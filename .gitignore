@@ -1,3 +1,7 @@
 .tools/
 *.zip
 *.exe
+__pycache__/
+debug_*.txt
+extracted_doc.txt
+parse_stats.txt

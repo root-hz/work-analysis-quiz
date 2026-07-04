@@ -22,7 +22,14 @@
 
   function applyTheme(theme) {
     document.body.dataset.theme = theme || 'blue';
-    const color = theme === 'red' ? '#b91c1c' : '#2563eb';
+    const colors = {
+      blue: '#2563eb',
+      red: '#b91c1c',
+      green: '#059669',
+      purple: '#7c3aed',
+      amber: '#d97706',
+    };
+    const color = colors[theme] || colors.blue;
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', color);
   }
 

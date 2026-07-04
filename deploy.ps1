@@ -59,7 +59,12 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "  部署成功！" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  访问地址: $pagesUrl" -ForegroundColor Yellow
+Write-Host "  首页:   $pagesUrl" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "  英语题库直达链接:" -ForegroundColor Cyan
+Write-Host "  听力:   ${pagesUrl}?quiz=english-listening" -ForegroundColor Green
+Write-Host "  阅读:   ${pagesUrl}?quiz=english-reading" -ForegroundColor Magenta
+Write-Host "  词汇:   ${pagesUrl}?quiz=english-vocabulary" -ForegroundColor DarkYellow
 Write-Host ""
 Write-Host "  首次部署可能需要 1-3 分钟生效" -ForegroundColor Gray
 Write-Host ""
